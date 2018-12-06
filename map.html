@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+	<title>USA trip october 2018</title>
+	<link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+
+<!--
+    <script src="https://code.jquery.com/jquery-1.9.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.12.6/js/standalone/selectize.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.12.6/css/selectize.default.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.sumoselect/3.0.3/jquery.sumoselect.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.sumoselect/3.0.3/sumoselect.min.css">
+    <script src="https://joker-x.github.io/Leaflet.geoCSV/leaflet.geocsv-src.js"></script>
+    <script src="http://rawgit.com/turban/Leaflet.Photo/gh-pages/Leaflet.Photo.js"></script>
+    <link rel="stylesheet" href="http://rawgit.com/turban/Leaflet.Photo/gh-pages/Leaflet.Photo.css"/>
+    <link rel="stylesheet" href="https://rawgit.com/turban/Leaflet.Photo/gh-pages/examples/css/map.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/leaflet-src.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/leaflet.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/0.4.0/leaflet.markercluster-src.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/0.4.0/MarkerCluster.css"/>
+-->
+
+    <script src="lib/jquery-1.9.1.js"></script>
+    <script src="lib/leaflet-src.js?v=0.7.7"></script>
+    <link rel="stylesheet" href="lib/leaflet.css?v=0.7.7"/>
+    <script src="lib/leaflet.markercluster-src.js?v=0.4.0"></script>
+    <link rel="stylesheet" href="lib/MarkerCluster.css?v=0.4.0"/>
+    <script src="lib/Leaflet.Photo.js"></script>
+    <link rel="stylesheet" href="lib/Leaflet.Photo.css"/>
+    <link rel="stylesheet" href="lib/map.css"/>
+    <script src="lib/leaflet.geocsv-src.js"></script>
+    <script src="lib/jquery.sumoselect.js"></script>
+    <link rel="stylesheet" href="lib/sumoselect.css">
+
+<style>
+
+html,
+body,
+#map {
+  width: 97%;
+  height: 97%;
+  padding: 0px;
+  margin: 0px;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #333;
+}
+
+.infopop h4 {
+    font: 14px/16px Arial, Helvetica, sans-serif;
+    font-weight: bold;
+    margin: 0 0 0px;
+    color: #777;
+}
+
+th.tg-0lax {
+    width: 18%;
+}
+
+</style>
+
+</head>
+<body>
+
+<table class="tg">
+  <tr>
+    <th class="tg-0lax">
+        <select class="form-control" id="selDate"></select>
+    </th>
+    <th class="tg-0lax">
+        <select class="form-control" id="selState"></select>
+    </th>
+    <th class="tg-0lax">
+        <select class="form-control" id="selTown"></select>
+    </th>
+    <th class="tg-0lax">
+        <input type="button" value="Show photos & videos" id="btnShowPhotos" />
+    </th>
+    <th class="tg-0lax">
+        <input type="button" value="Show videos only" id="btnShowVideos" />
+    </th>
+  </tr>
+</table>
+
+<div id="map"></div>
+
+<script>
+
+const IMAGES_CSV = "map_markers_data.csv.dos";
+
+// show button wrapper
+function enableShowPhotosButton(state) {
+    const btn = $('#btnShowPhotos')[0];
+    btn.disabled = !state;
+    return btn;
+}
+function enableShowVideosButton(state) {
+    const btn = $('#btnShowVideos')[0];
+    btn.disabled = !state;
+    return btn;
+}
+enableShowPhotosButton(false);
+enableShowVideosButton(false);
+
+// photos filter UI
+const filterAll = 'all';
+const filterOptions = {placeholder: filterAll};
+const filterSelectors = [
+    $('#selDate').SumoSelect(filterOptions),
+    $('#selState').SumoSelect(filterOptions),
+    $('#selTown').SumoSelect(filterOptions)
+];
+
+// global container for all images
+var photos = [{
+  "lat": 34.04555452,
+  "lng": -118.3001509,
+  "name": "C.H. Johnston, 1951",
+  "url": "http://41.media.tumblr.com/8dd3cc5931650a6a772db77f6fad797b/tumblr_n5c7uw79Yn1tq6tdto1_400.jpg",
+  "thumbnail": "http://41.media.tumblr.com/8dd3cc5931650a6a772db77f6fad797b/tumblr_n5c7uw79Yn1tq6tdto1_400.jpg"
+}];
+
+// collback after csv loaded and parsed;
+// load data to filter + show UI panel
+function setupFilter() {
+    console.log("setupFilter ...");
+
+    // get filter list items from array of photos
+    const sets = getItemsSets(photos);
+
+    function setupSelect(sel, items, choice) {
+        // add items to select lists
+        updateSelect(sel, items, choice);
+        // setup select change callback
+        sel.sumo.E.on('change', null, sel.id, evt => {
+            console.log(`on change, sel.id: '${evt.data}', sel.placeholder: '${evt.target.sumo.placeholder}'`);
+            if(typeof $.updating === 'undefined' || $.updating == false) {
+                $.updating = true;
+                updateFilter(getFilter(filterSelectors));
+                $.updating = false;
+            }
+        });
+    }
+
+    [0, 1, 2].forEach(idx => setupSelect(
+        filterSelectors[idx],
+        sets[idx],
+        filterAll)
+    );
+
+    // setup show buttons
+    enableShowPhotosButton(true).onclick =
+        () => renderMarkersLayer(filterPhotos);
+    enableShowVideosButton(true).onclick =
+        () => renderMarkersLayer(filterVideos);
+
+    console.log("setupFilter done.");
+}
+
+// make 3 sorted sets from photos date,state,town
+function getItemsSets(photos) {
+    const sets = [new Set(), new Set(), new Set()];
+    photos.forEach(function(photo) {
+        const parts = photo['name'].split(';');
+        [0, 1, 2].forEach(idx => sets[idx].add(parts[idx].trim()));
+    });
+    return sets.map(s => Array.from(s).sort())
+}
+
+// recreate select options
+function updateSelect(sel, items, choice) {
+    // modified sel.sumo.removeAll();
+    function removeAll() {
+        const obj = sel.sumo;
+        const options = obj.E.find('option');
+        for (var x = (options.length - 1); x >= 0; x--) {
+            obj.remove(x);
+        }
+    }
+
+    // clear sel list
+    sel.sumo.unSelectAll();
+    removeAll();
+
+    // add items to select lists
+    sel.sumo.add(filterAll);
+    items.forEach(itm => sel.sumo.add(itm));
+    sel.sumo.selectItem(choice);
+}
+
+// recreate filter UI
+function updateFilter(selected) {
+    console.log('updateFilter', selected);
+    const choices = [selected.date, selected.state, selected.town].map(itm => {
+        if(itm == '') return filterAll; else return itm;
+    });
+    console.log('updateFilter', choices);
+
+    const filteredPhotos = filterPhotos(photos, selected);
+    const allitems = getItemsSets(filteredPhotos);
+
+    [0, 1, 2].forEach(idx => {
+        const sel = filterSelectors[idx];
+        const items = allitems[idx];
+        const choice = choices[idx];
+        updateSelect(sel, items, choice);
+    });
+}
+
+// filter photos array using transformed UI input
+function filterPhotos(arr, selected) {
+    const dst = [selected['date'], selected['state'], selected['town']];
+    function partOK(flt, itm) { return (flt == '' || flt == itm); }
+
+    return arr.filter(photo => {
+        const parts = photo['name'].split(';');
+        return [0, 1, 2].every(idx => partOK(dst[idx], parts[idx].trim()));
+    });
+}
+// filter only videos
+function filterVideos(arr, selected) {
+    return filterPhotos(arr, selected)
+        .filter(photo => photo['url'].endsWith('.mp4'));
+}
+
+// transform UI data to filter data
+function getFilter(sels) {
+    const fs = sels.map(s => s.sumo.placeholder.trim())
+        .map(s => {if(s == filterAll) return ''; else return s;});
+
+    return {
+        'date' : fs[0],
+        'state': fs[1],
+        'town' : fs[2]
+    }
+}
+
+// create photo object from parsed csv record
+function newPhoto(feature) {
+    const coords = feature.geometry.coordinates;
+    const props = feature.properties;
+
+    const fname = props['sourcefile'].slice(37);
+
+    const photo = {
+        'lat': coords[1],
+        'lng': coords[0],
+        'name': props['compositesubsecdatetimeoriginal'].slice(0, 10) + ';' +
+                props['state'] + ';' +
+                props['town'],
+        'url': fname,
+        'thumbnail': 'thumb/thumb-' + fname.split('/')[1].split('.')[0] + '.jpg'
+        // usa-vid/VID_20181005_152619.mp4 => thumb/thumb-VID_20181005_152619.jpg
+    };
+
+    return photo;
+}
+
+// callback after csv loaded to window
+var csvlayer = '';
+function processCSV(csvtext) {
+    csvlayer = L.geoCsv(csvtext, {
+        firstLineTitles: true,
+        fieldSeparator: ',',
+        latitudeTitle: 'Composite:GPSLatitude',
+        longitudeTitle: 'Composite:GPSLongitude',
+        lineSeparator: '\r\n',
+        quoteSymbol: '"'
+    });
+
+    console.assert(Object.keys(csvlayer._layers).length == 1302+30, 'unexpected num of parsed csv lines');
+
+    // create global array of photos
+    photos = Object.keys(csvlayer._layers)
+        .map(k => newPhoto(csvlayer._layers[k].feature));
+}
+
+// map setup
+
+// set center coordinates
+const center = [40, -34];
+// set default zoom level
+const zoomLevel = 3;
+// initialize map
+const map = L.map('map').setView(center, zoomLevel);
+
+// set source for map tiles
+const cdbAttr = '&copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
+  '<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a> | ' +
+  '&copy; <a href="http://cartodb.com/attributions">CartoDB</a>';
+const cdbUrl = 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
+
+const mbAttr = 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, ' +
+    '<a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
+    'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>';
+const mbUrl = 'https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+
+// create base layers
+const grayscaleCDB = L.tileLayer(cdbUrl, {attribution: cdbAttr});
+const grayscaleMBX = L.tileLayer(mbUrl, {id: 'mapbox.light', attribution: mbAttr});
+const streetsMBX = L.tileLayer(mbUrl, {id: 'mapbox.streets',   attribution: mbAttr});
+const osmCLR = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+	maxZoom: 19,
+	attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+});
+const osmBW = L.tileLayer('http://{s}.tiles.wmflabs.org/bw-mapnik/{z}/{x}/{y}.png', {
+	maxZoom: 18,
+	attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+});
+const otmCLR = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+	maxZoom: 17,
+	attribution: 'Map data: &copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+});
+const thunderforestOTD = L.tileLayer('https://{s}.tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey={apikey}', {
+	attribution: '&copy; <a href="http://www.thunderforest.com/">Thunderforest</a>, &copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+	apikey: 'db5ae1f5778a448ca662554581f283c5',
+	maxZoom: 22
+});
+// more on https://leaflet-extras.github.io/leaflet-providers/preview/
+
+// create photo layer, clustered thumbnails
+const photoLayer = L.photo.cluster({
+    featureGroup: L.photo,
+    maxClusterRadius: 100,
+    showCoverageOnHover: false,
+    spiderfyDistanceMultiplier: 3,
+    icon: {iconSize: [100, 100]}});
+
+photoLayer.on('click', function(evt) {
+  const photo = evt.layer.photo;
+
+  var template = '<a href="{url}"><img src="{url}"/></a><p>{name}</p>';
+
+  if (photo.url.endsWith('.mp4') && (!!document.createElement('video')
+    .canPlayType('video/mp4; codecs=avc1.42E01E,mp4a.40.2')
+  )) {
+    template = '<video autoplay loop controls poster="{thumbnail}" ' +
+        ' width="600" height="600"> ' +
+        ' <source src="{url}" type="video/mp4"/></video> '  +
+        ' <p>{name} <a href="{url}"> {url} </a></p>';
+  };
+
+  evt.layer.bindPopup(L.Util.template(template, photo), {
+    className: 'leaflet-popup-photo',
+    minWidth: 800
+  }).openPopup();
+});
+
+// add filtered photos to map
+function renderMarkersLayer(filterFunc) {
+    photoLayer.clear();
+    const filter = getFilter(filterSelectors);
+    const filtered = filterFunc.call(this, photos, filter);
+    console.log("filtered: ", filtered.length);
+    photoLayer.add(filtered);
+    map.fitBounds(photoLayer.getBounds());
+}
+
+// add layers to map
+map.addLayer(grayscaleCDB);
+map.addLayer(photoLayer);
+
+// add layers control
+const baseLayers = {
+    "Grayscale cdb": grayscaleCDB,
+    "Grayscale mbx": grayscaleMBX,
+    "Streets": streetsMBX,
+    "OSM": osmCLR,
+    "OSM black/white": osmBW,
+    "OTM": otmCLR,
+    "Thunderforest outdoors": thunderforestOTD };
+const overlays = { "Photos": photoLayer };
+L.control.layers(baseLayers, overlays).addTo(map);
+
+// load photos
+$.ajax({
+    type: "GET",
+    url : IMAGES_CSV,
+    dataType: "text",
+    success : function(txt) { processCSV(txt); setupFilter(); }
+});
+
+</script>
+
+</body>
+</html>

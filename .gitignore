@@ -1,0 +1,9 @@
+Image-ExifTool-11.16/
+usa-ph/
+usa-vid/
+thumb/
+__pycache__/
+
+*.csv
+*.dos
+*.norm
