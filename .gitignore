@@ -1,8 +1,11 @@
 Image-ExifTool-11.16/
 usa-ph/
 usa-vid/
+usa-ph.nat/
+usa-vid.nat/
 thumb/
 __pycache__/
+t/
 
 *.csv
 *.dos

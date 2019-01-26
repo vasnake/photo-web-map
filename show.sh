@@ -68,7 +68,9 @@ main() {
 
     if [ ${__argsLen} -ge 1 ]; then
         if [ "${__arg1}" = "dumpInfo" ]; then
-            dumpInfo "${__dir}/usa-ph" "${__dir}/usa-vid"
+            #~ dumpInfo "${__dir}/usa-ph" "${__dir}/usa-vid" "data1"
+            #~ dumpInfo "${__dir}/usa-ph.nat" "${__dir}/usa-vid.nat" "data2"
+            mergeAndNormalize "data1" "data2"
         elif [ "${__arg1}" = "geocode" ]; then
             geocode
         elif [ "${__arg1}" = "map" ]; then
@@ -127,6 +129,9 @@ setupPython() {
     sudo docker image ls -a
     echo sudo docker run hello-world
 
+    # docker root problem workaround for generated files
+    setfacl -m "default:group::rwx" "${__dir}"
+
     # check python in docker
 #~ -i, --interactive                    Keep STDIN open even if not attached
 #~ -t, --tty                            Allocate a pseudo-TTY
@@ -142,7 +147,7 @@ setupPython() {
         python test.py
 
     # build image with needed modules
-    echo sudo docker build --rm \
+    sudo docker build --rm \
         -t ${DOCKERIMAGE} docker
 
     # check python modules setup
@@ -235,6 +240,7 @@ setupPyenvPython() {
 dumpInfo() {
     local photosDir=${1}
     local videoDir=${2}
+    local tag=${3}
 
     # tags list
     #~ -a          (-duplicates)        Allow duplicate tags to be extracted
@@ -244,24 +250,25 @@ dumpInfo() {
     echo Image-ExifTool-11.16/exiftool -a -G1 -s -n ${photosDir}/IMG_20181007_130100.jpg
 
     # export jpg metadata to csv
-    #~ Image-ExifTool-11.16/exiftool -a -G1 -s -n -csv "${photosDir}" > "${__dir}/photo_data_tab.csv"
+    Image-ExifTool-11.16/exiftool -a -G1 -s -n -csv "${photosDir}" > "${__dir}/photo_${tag}_tab.csv"
 
     # export mp4 metadata to csv
-    #~ echo "SourceFile" > "${__dir}/video_data_tab.csv"
-    #~ ls -rt -d -1 "${videoDir}"/* >> "${__dir}/video_data_tab.csv"
+    echo "SourceFile" > "${__dir}/video_${tag}_tab.csv"
+    ls -rt -d -1 "${videoDir}"/* >> "${__dir}/video_${tag}_tab.csv"
 
-    # create thumbnails
-    if [ "$(ls -1 thumb | wc -l)" != "1332" ]; then
+    # create thumbnails # 2691 = 1302 + 30 + 1320 + 39
+    if [ "$(ls -1 thumb | wc -l)" != "2691" ]; then
         mkdir -p thumb
         pushd ${photosDir}
-        for fn in IMG*.jpg; do
-            convert -thumbnail 200 ${fn} thumb-${fn};
+        mkdir -p tmp
+        for fn in *.jpg; do
+            convert -thumbnail 200 ${fn} tmp/thumb-${fn};
         done;
         popd
-        mv -v ${photosDir}/thumb-*.jpg thumb/
+        mv -v ${photosDir}/tmp/thumb-*.jpg thumb/
 
         pushd ${videoDir}
-        for fn in VID*.mp4; do
+        for fn in *.mp4; do
             ffmpeg -i ${fn} -y -an -ss 00:00:01 -vcodec png -r 1 -vframes 1 -s 256x144 thumb-${fn}.png
             convert thumb-${fn}.png thumb-${fn%%.*}.jpg
             rm thumb-${fn}.png
@@ -269,18 +276,43 @@ dumpInfo() {
         popd
         mv -v ${videoDir}/thumb-*.jpg thumb/
     fi
+}
+
+mergeAndNormalize() {
+    local tag1=${1}
+    local tag2=${2}
 
     # docker root problem workaround for generated files
     setfacl -m "default:group::rwx" "${__dir}"
 
+    # select columns that needed for downstream processing
+    for tag in $tag1 $tag2; do
+        sudo docker run -it --rm \
+            --name csv-project \
+            -v "${__dir}":/usr/src/project \
+            -w /usr/src/project \
+            ${DOCKERIMAGE} \
+            python -u project_csv.py \
+            "photo_${tag}_tab.csv" "photo_${tag}_tab_projected.csv"
+    done;
+
+    # merge photo data
+    cat         "${__dir}/photo_${tag1}_tab_projected.csv" >  "${__dir}/photo_data_tab.csv"
+    tail -n +2  "${__dir}/photo_${tag2}_tab_projected.csv" >> "${__dir}/photo_data_tab.csv"
+
+    # merge video data
+    cat         "${__dir}/video_${tag1}_tab.csv" >  "${__dir}/video_data_tab.csv"
+    tail -n +2  "${__dir}/video_${tag2}_tab.csv" >> "${__dir}/video_data_tab.csv"
+
     # normalize dataset: select columns subset; replace null values with default values;
-    # union with video data, interpolate video lon,lat from nearest photo
-    echo sudo docker run -it --rm \
+    # merge with video data, interpolate video lon,lat from nearest photo
+    sudo docker run -it --rm \
         --name csv-py \
         -v "${__dir}":/usr/src/project \
         -w /usr/src/project \
         ${DOCKERIMAGE} \
-        bash normcsv.sh
+        python -u normcsv.py \
+            photo_data_tab.csv video_data_tab.csv norm_data_tab.csv
 
     # output: norm_data_tab.csv
 }
