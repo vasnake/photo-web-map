@@ -4,7 +4,7 @@
 
 """
 Purpose: filter and normalize photos data given from exiftool csv dump;
-copy photo data to video files using date-time nearest photo.
+copy photo meta-data to video files using date-time nearest photo.
 
 normalize dataset: select columns subset; replace null values with default values
     SourceFile
@@ -26,7 +26,7 @@ import math
 
 from collections import OrderedDict
 from itertools import zip_longest
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def list_out_fields():
@@ -61,26 +61,44 @@ def csv_options():
         strict=True
     )
 
-def split_n_trim(txt):
+def split_n_trim(txt, sep='\n'):
     """Return list of non-empty strings from input splitted by blank chars
     """
-    lst = txt.splitlines()
+    lst = txt.split(sep)
     return [x.strip() for x in lst if x.strip()]
-
-def normalize_value(colname, colvalue):
-    """Return tuple (name, value) where empty value replaced with '0'
-    """
-    v = colvalue.strip()
-    if len(v) < 1:
-        v = '0'
-
-    return (colname, v)
 
 def normalize_row(row, columns):
     """Return OrderedDict where keys list == columns and values normalized
+
+SourceFile => Composite:SubSecDateTimeOriginal
+
+.../P81028-105149.jpg => 2018:10:28 11:51:49.87
+.../P81028-083502.jpg => 1028-083502 => 2018:10:28 08:35:02 => 2018:10:28 09:35:02.00
     """
+    dtf = datetime_format()['format']
+    dtl = datetime_format()['len']
+
+    def fts2dts(fts):
+        dt = datetime.strptime(fts, '%Y%m%d-%H%M%S')
+        return (dt + timedelta(minutes=30)).strftime(dtf)[:dtl]
+
+    def dateTimeFromFileName(fname):
+        parts = split_n_trim(fname, '/')
+        lastPart = parts[-1]
+        fts = (lastPart[2:])[0:-4]
+        dts = fts2dts('2018'+fts)
+        print("timestamp from filename: {} => {}".format(fts, dts))
+        return dts
+
+    def normalize_value(colname, colvalue):
+        val = colvalue.strip()
+        if val == '' and colname == 'Composite:SubSecDateTimeOriginal':
+            val = dateTimeFromFileName(row['SourceFile'].strip())
+
+        return (colname, val)
+
     return OrderedDict([
-        normalize_value(k,row[k]) for k in columns
+        normalize_value(k,row.get(k, '')) for k in columns
     ])
 
 def check_columns(cols, expected_cols):
@@ -106,8 +124,8 @@ def check_csv_file(fname, csvopts, exp_flds, exp_nrecs):
     assert nlines == exp_nrecs, "nlines: {}, should be {}".format(nlines, exp_nrecs)
     print("file '{}' OK, {} lines checked".format(fname, nlines))
 
-def norm_photo(infile='jpg-test.csv', outfile='norm_test.csv'):
-    """Write selected fields, empty values replaced with '0'
+def norm_photo(infile='in_test.csv', outfile='out_test.csv'):
+    """Write selected fields, empty values replaced with data from nearest records
     """
     csvopts = csv_options()
     flds = list_out_fields()
@@ -121,22 +139,19 @@ def norm_photo(infile='jpg-test.csv', outfile='norm_test.csv'):
 
             for row in reader:
                 nlines += 1
-                assert len(row) == 88, "len(row): {}".format(len(row))
-
+                # compute normalized row
                 norm_row = normalize_row(row, flds)
-
+                # check
                 msg = "len(norm_row) != len(flds): {} != {}"
                 assert len(norm_row) == len(flds), msg.format(len(norm_row), len(flds))
                 check_columns(norm_row.keys(), flds)
-                for k,v in norm_row.items():
-                    assert len(v.strip()) > 0, "empty column: {}".format(k)
-
+                # save/store/write
                 writer.writerow(norm_row)
 
-    assert nlines == 1302, "nlines: {}".format(nlines)
+    assert nlines == 2623, "nlines: {}".format(nlines)
     print("file '{}' OK, {} lines readed".format(infile, nlines))
     # check writed file, optional
-    check_csv_file(outfile, csvopts, flds, 1302)
+    #~ check_csv_file(outfile, csvopts, flds, 2622)
 
 def load_photos(infile):
     """Load photos to sorted array. Sort by time attribute
