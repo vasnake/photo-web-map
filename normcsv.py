@@ -16,7 +16,7 @@ normalize dataset: select columns subset; replace null values with default value
 
 Expected usage:
     export PYTHONIOENCODING=UTF-8
-    python -u normcsv.py photo_data_tab.csv video_data_tab.csv norm_data_tab.csv
+    python -u normcsv.py photo_video_data_tab.csv norm_data_tab.csv
 """
 
 import sys
@@ -75,14 +75,15 @@ SourceFile => Composite:SubSecDateTimeOriginal
 .../P81028-105149.jpg => 2018:10:28 11:51:49.87
 .../P81028-083502.jpg => 1028-083502 => 2018:10:28 08:35:02 => 2018:10:28 09:35:02.00
     """
-    dtf = datetime_format()['format']
-    dtl = datetime_format()['len']
-
-    def fts2dts(fts):
-        dt = datetime.strptime(fts, '%Y%m%d-%H%M%S')
-        return (dt + timedelta(minutes=30)).strftime(dtf)[:dtl]
 
     def dateTimeFromFileName(fname):
+        dtf = datetime_format()['format']
+        dtl = datetime_format()['len']
+
+        def fts2dts(fts):
+            dt = datetime.strptime(fts, '%Y%m%d-%H%M%S')
+            return (dt + timedelta(minutes=30)).strftime(dtf)[:dtl]
+
         parts = split_n_trim(fname, '/')
         lastPart = parts[-1]
         fts = (lastPart[2:])[0:-4]
@@ -98,7 +99,7 @@ SourceFile => Composite:SubSecDateTimeOriginal
         return (colname, val)
 
     return OrderedDict([
-        normalize_value(k,row.get(k, '')) for k in columns
+        normalize_value(k, row.get(k, '')) for k in columns
     ])
 
 def check_columns(cols, expected_cols):
@@ -326,10 +327,8 @@ def end_time(start_ns):
 
 def main():
     st = start_time()
-    photo,video,outfile = sys.argv[1:4]
-    norm_photo(photo, photo + '.norm')
-    norm_video(video, photo + '.norm', video + '.norm')
-    union_csv(photo + '.norm', video + '.norm', outfile)
+    infile,outfile = sys.argv[1:3]
+    norm_photo(infile, outfile)
     end_time(st)
 
 if __name__ == "__main__":

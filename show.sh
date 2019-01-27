@@ -287,32 +287,32 @@ mergeAndNormalize() {
 
     # select columns that needed for downstream processing
     for tag in $tag1 $tag2; do
-        sudo docker run -it --rm \
-            --name csv-project \
-            -v "${__dir}":/usr/src/project \
-            -w /usr/src/project \
-            ${DOCKERIMAGE} \
-            python -u project_csv.py \
-            "photo_${tag}_tab.csv" "photo_${tag}_tab_projected.csv"
+        for part in "photo" "video"; do
+            sudo docker run -it --rm \
+                --name csv-project \
+                -v "${__dir}":/usr/src/project \
+                -w /usr/src/project \
+                ${DOCKERIMAGE} \
+                python -u project_csv.py \
+                "${part}_${tag}_tab.csv" "${part}_${tag}_tab_projected.csv"
+        done;
     done;
 
     # merge photo data
-    cat         "${__dir}/photo_${tag1}_tab_projected.csv" >  "${__dir}/photo_data_tab.csv"
-    tail -n +2  "${__dir}/photo_${tag2}_tab_projected.csv" >> "${__dir}/photo_data_tab.csv"
-
+    cat         "${__dir}/photo_${tag1}_tab_projected.csv" >  "${__dir}/photo_video_data_tab.csv"
+    tail -n +2  "${__dir}/photo_${tag2}_tab_projected.csv" >> "${__dir}/photo_video_data_tab.csv"
     # merge video data
-    cat         "${__dir}/video_${tag1}_tab.csv" >  "${__dir}/video_data_tab.csv"
-    tail -n +2  "${__dir}/video_${tag2}_tab.csv" >> "${__dir}/video_data_tab.csv"
+    tail -n +2  "${__dir}/video_${tag1}_tab_projected.csv" >> "${__dir}/photo_video_data_tab.csv"
+    tail -n +2  "${__dir}/video_${tag2}_tab_projected.csv" >> "${__dir}/photo_video_data_tab.csv"
 
-    # normalize dataset: select columns subset; replace null values with default values;
-    # merge with video data, interpolate video lon,lat from nearest photo
+    # normalize dataset: select columns subset; replace null values with calculated values
     sudo docker run -it --rm \
         --name csv-py \
         -v "${__dir}":/usr/src/project \
         -w /usr/src/project \
         ${DOCKERIMAGE} \
         python -u normcsv.py \
-            photo_data_tab.csv video_data_tab.csv norm_data_tab.csv
+            photo_video_data_tab.csv norm_data_tab.csv
 
     # output: norm_data_tab.csv
 }
