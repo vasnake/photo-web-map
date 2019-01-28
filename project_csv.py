@@ -27,44 +27,13 @@ from collections import OrderedDict
 from itertools import zip_longest
 from datetime import datetime
 
+from normcsv import (
+    start_time,
+    end_time,
+    csv_options,
+    list_out_fields,
+    datetime_format)
 
-def list_out_fields():
-    """Output csv columns names
-    """
-    lst = """
-        SourceFile
-        IFD0:Orientation
-        Composite:GPSAltitude
-        Composite:GPSLatitude
-        Composite:GPSLongitude
-        Composite:SubSecDateTimeOriginal
-    """
-    return split_n_trim(lst)
-
-def datetime_format():
-    """Date and time values format used in csv
-    """
-    return {'format': '%Y:%m:%d %H:%M:%S.%f', 'len': 22}
-
-def csv_options():
-    """CSV format options
-    """
-    return dict(
-        delimiter=',',
-        quotechar='"',
-        doublequote=True,
-        escapechar='"',
-        quoting=csv.QUOTE_NONE,
-        lineterminator="\r\n",
-        skipinitialspace=False,
-        strict=True
-    )
-
-def split_n_trim(txt):
-    """Return list of non-empty strings from input splitted by blank chars
-    """
-    lst = txt.splitlines()
-    return [x.strip() for x in lst if x.strip()]
 
 def check_columns(cols, expected_cols):
     """Assert that cols list is equal expected_cols list
@@ -75,13 +44,6 @@ def check_columns(cols, expected_cols):
 
 def normalize_value(colname, colvalue):
     return (colname, colvalue.strip())
-
-def getOrElse(row, k, nv):
-    try:
-        val = row[k]
-    except KeyError:
-        val = nv
-    return val
 
 def normalize_row(row, columns):
     """Return OrderedDict where keys list == columns and values normalized
@@ -119,25 +81,6 @@ def project(infile='in_test.csv', outfile='out_test.csv'):
                 writer.writerow(norm_row)
 
     print("file '{}' OK, {} lines readed".format(infile, nlines))
-
-def start_time():
-    start_ns = time.time_ns()
-    print("start, nanoseconds from epoch: {}".format(start_ns))
-    return start_ns
-
-def end_time(start_ns):
-    end_ns = time.time_ns()
-    dur_ns = end_ns - start_ns
-
-    print("""end, nanoseconds from epoch: {};
-        duration: {} nanoseconds
-        or {} microseconds
-        or {} milliseconds
-        or {} seconds""".format(
-        end_ns, dur_ns, dur_ns / 1000, dur_ns / 1000000, dur_ns / 1000000000
-    ))
-
-    return end_ns
 
 def main():
     st = start_time()

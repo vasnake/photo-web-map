@@ -70,25 +70,32 @@ def split_n_trim(txt, sep='\n'):
 def normalize_row(row, columns):
     """Return OrderedDict where keys list == columns and values normalized
 
-SourceFile => Composite:SubSecDateTimeOriginal
+    datetime calc. variations: SourceFile => Composite:SubSecDateTimeOriginal
 
-.../P81028-105149.jpg => 2018:10:28 11:51:49.87
-.../P81028-083502.jpg => 1028-083502 => 2018:10:28 08:35:02 => 2018:10:28 09:35:02.00
+    .../P81028-105149.jpg => 2018:10:28 11:51:49.00
+    .../V81005-152637.mp4 => 2018:10:05 15:26:37.00
+    .../VID_20181005_152619.mp4 => 2018:10:05 15:26:19.00
     """
 
-    def dateTimeFromFileName(fname):
+    def dateTimeFromFileName(path):
         dtf = datetime_format()['format']
         dtl = datetime_format()['len']
+        fname = split_n_trim(path.upper(), '/')[-1]
 
-        def fts2dts(fts):
-            dt = datetime.strptime(fts, '%Y%m%d-%H%M%S')
-            return (dt + timedelta(minutes=30)).strftime(dtf)[:dtl]
+        def fn2ts(dts, fmt, delta):
+            dt = datetime.strptime(dts, fmt)
+            ts = dt.timestamp()
+            assert dts == datetime.fromtimestamp(ts).strftime(fmt)
+            return (dt + delta).strftime(dtf)[:dtl]
 
-        parts = split_n_trim(fname, '/')
-        lastPart = parts[-1]
-        fts = (lastPart[2:])[0:-4]
-        dts = fts2dts('2018'+fts)
-        print("timestamp from filename: {} => {}".format(fts, dts))
+        if fname.startswith('P8') or fname.startswith('V8'):
+            dts = fn2ts('2018'+fname[2:-4], '%Y%m%d-%H%M%S', timedelta(minutes=0))
+        elif fname.startswith('VID_'):
+            dts = fn2ts(fname[4:-4], '%Y%m%d_%H%M%S', timedelta(minutes=0))
+        else:
+            raise ValueError(fname)
+
+        print("timestamp from filename: {} => {}".format(fname, dts))
         return dts
 
     def normalize_value(colname, colvalue):
@@ -125,8 +132,8 @@ def check_csv_file(fname, csvopts, exp_flds, exp_nrecs):
     assert nlines == exp_nrecs, "nlines: {}, should be {}".format(nlines, exp_nrecs)
     print("file '{}' OK, {} lines checked".format(fname, nlines))
 
-def norm_photo(infile='in_test.csv', outfile='out_test.csv'):
-    """Write selected fields, empty values replaced with data from nearest records
+def normalize(infile='in_test.csv', outfile='out_test.csv'):
+    """Write selected fields, replace empty datetime with values from filename
     """
     csvopts = csv_options()
     flds = list_out_fields()
@@ -149,10 +156,10 @@ def norm_photo(infile='in_test.csv', outfile='out_test.csv'):
                 # save/store/write
                 writer.writerow(norm_row)
 
-    assert nlines == 2623, "nlines: {}".format(nlines)
+    assert nlines == 2692, "nlines: {}".format(nlines)
     print("file '{}' OK, {} lines readed".format(infile, nlines))
     # check writed file, optional
-    #~ check_csv_file(outfile, csvopts, flds, 2622)
+    #~ check_csv_file(outfile, csvopts, flds, 2691)
 
 def load_photos(infile):
     """Load photos to sorted array. Sort by time attribute
@@ -328,7 +335,8 @@ def end_time(start_ns):
 def main():
     st = start_time()
     infile,outfile = sys.argv[1:3]
-    norm_photo(infile, outfile)
+    normalize(infile, outfile)
+    # fillEmptyCoords
     end_time(st)
 
 if __name__ == "__main__":
