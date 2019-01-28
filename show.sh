@@ -289,7 +289,7 @@ mergeAndNormalize() {
     for tag in $tag1 $tag2; do
         for part in "photo" "video"; do
             sudo docker run -it --rm \
-                --name csv-project \
+                --name project-py \
                 -v "${__dir}":/usr/src/project \
                 -w /usr/src/project \
                 ${DOCKERIMAGE} \
@@ -307,7 +307,7 @@ mergeAndNormalize() {
 
     # normalize dataset: select columns subset; replace null values with calculated values
     sudo docker run -it --rm \
-        --name csv-py \
+        --name norm-py \
         -v "${__dir}":/usr/src/project \
         -w /usr/src/project \
         ${DOCKERIMAGE} \
@@ -328,6 +328,9 @@ read -r -d '' MSG << EOF
 EOF
 
     echo ${MSG}
+
+    # docker root problem workaround for generated files
+    setfacl -m "default:group::rwx" "${__dir}"
 
     sudo docker run -it --rm \
         --name geocode-py \

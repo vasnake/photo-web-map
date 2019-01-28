@@ -30,9 +30,7 @@ from datetime import datetime
 from normcsv import (
     start_time,
     end_time,
-    csv_options,
-    list_out_fields,
-    datetime_format)
+    CSV)
 
 
 def check_columns(cols, expected_cols):
@@ -59,8 +57,8 @@ def fix_nulls(iter):
 def project(infile='in_test.csv', outfile='out_test.csv'):
     """Write selected fields
     """
-    csvopts = csv_options()
-    flds = list_out_fields()
+    csvopts = CSV.csv_options()
+    flds = CSV.list_out_fields()
 
     nlines = 0
     with open(infile, newline='') as inf:

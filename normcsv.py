@@ -29,43 +29,60 @@ from itertools import zip_longest
 from datetime import datetime, timedelta
 
 
-def list_out_fields():
-    """Output csv columns names
-    """
-    lst = """
-        SourceFile
-        IFD0:Orientation
-        Composite:GPSAltitude
-        Composite:GPSLatitude
-        Composite:GPSLongitude
-        Composite:SubSecDateTimeOriginal
-    """
-    return split_n_trim(lst)
+class CSV:
+    COLNAME_PATH = 'SourceFile'
+    COLNAME_TS   = 'Composite:SubSecDateTimeOriginal'
+    COLNAME_ALT  = 'Composite:GPSAltitude'
+    COLNAME_LAT  = 'Composite:GPSLatitude'
+    COLNAME_LON  = 'Composite:GPSLongitude'
 
-def datetime_format():
-    """Date and time values format used in csv
-    """
-    return {'format': '%Y:%m:%d %H:%M:%S.%f', 'len': 22}
+    TS_FORMAT    = '%Y:%m:%d %H:%M:%S.%f'
+    TS_LEN       = 22
 
-def csv_options():
-    """CSV format options
-    """
-    return dict(
-        delimiter=',',
-        quotechar='"',
-        doublequote=True,
-        escapechar='"',
-        quoting=csv.QUOTE_NONE,
-        lineterminator="\r\n",
-        skipinitialspace=False,
-        strict=True
-    )
+    @staticmethod
+    def list_out_fields():
+        """Output csv columns names
+        """
+        lst = [
+            CSV.COLNAME_PATH,
+            'IFD0:Orientation',
+            CSV.COLNAME_ALT,
+            CSV.COLNAME_LAT,
+            CSV.COLNAME_LON,
+            CSV.COLNAME_TS
+        ]
+        return lst
 
-def split_n_trim(txt, sep='\n'):
-    """Return list of non-empty strings from input splitted by blank chars
-    """
-    lst = txt.split(sep)
-    return [x.strip() for x in lst if x.strip()]
+    @staticmethod
+    def datetime_format():
+        """Date and time values format used in csv
+        """
+        return dict(
+            format = CSV.TS_FORMAT,
+            len = CSV.TS_LEN
+        )
+
+    @staticmethod
+    def dt2ts(dts):
+        dt = datetime.strptime(dts, CSV.TS_FORMAT)
+        ts = dt.timestamp()
+        assert dts == datetime.fromtimestamp(ts).strftime(CSV.TS_FORMAT)[:CSV.TS_LEN]
+        return ts
+
+    @staticmethod
+    def csv_options():
+        """CSV format options
+        """
+        return dict(
+            delimiter=',',
+            quotechar='"',
+            doublequote=True,
+            escapechar='"',
+            quoting=csv.QUOTE_NONE,
+            lineterminator="\r\n",
+            skipinitialspace=False,
+            strict=True
+        )
 
 def normalize_row(row, columns):
     """Return OrderedDict where keys list == columns and values normalized
@@ -78,8 +95,8 @@ def normalize_row(row, columns):
     """
 
     def dateTimeFromFileName(path):
-        dtf = datetime_format()['format']
-        dtl = datetime_format()['len']
+        dtf = CSV.TS_FORMAT
+        dtl = CSV.TS_LEN
         fname = split_n_trim(path.upper(), '/')[-1]
 
         def fn2ts(dts, fmt, delta):
@@ -100,8 +117,8 @@ def normalize_row(row, columns):
 
     def normalize_value(colname, colvalue):
         val = colvalue.strip()
-        if val == '' and colname == 'Composite:SubSecDateTimeOriginal':
-            val = dateTimeFromFileName(row['SourceFile'].strip())
+        if val == '' and colname == CSV.COLNAME_TS:
+            val = dateTimeFromFileName(row[CSV.COLNAME_PATH].strip())
 
         return (colname, val)
 
@@ -109,34 +126,11 @@ def normalize_row(row, columns):
         normalize_value(k, row.get(k, '')) for k in columns
     ])
 
-def check_columns(cols, expected_cols):
-    """Assert that cols list is equal expected_cols list
-    """
-    pairs = zip_longest(cols, expected_cols, fillvalue='oops')
-    for c,e in pairs:
-        assert c == e, "column {} != expected col {}".format(c, e)
-
-def check_csv_file(fname, csvopts, exp_flds, exp_nrecs):
-    """Check if file have all fields and values are not empty
-    """
-    nlines = 0
-    with open(fname, newline='') as inf:
-        reader = csv.DictReader(inf, **csvopts)
-        for row in reader:
-            nlines += 1
-            assert len(row) == len(exp_flds), "len(row): {}".format(len(row))
-            check_columns(row.keys(), exp_flds)
-            for k,v in row.items():
-                assert len(v.strip()) > 0, "empty column value: {}".format(k)
-
-    assert nlines == exp_nrecs, "nlines: {}, should be {}".format(nlines, exp_nrecs)
-    print("file '{}' OK, {} lines checked".format(fname, nlines))
-
 def normalize(infile='in_test.csv', outfile='out_test.csv'):
     """Write selected fields, replace empty datetime with values from filename
     """
-    csvopts = csv_options()
-    flds = list_out_fields()
+    csvopts = CSV.csv_options()
+    flds = CSV.list_out_fields()
 
     nlines = 0
     with open(infile, newline='') as inf:
@@ -156,48 +150,48 @@ def normalize(infile='in_test.csv', outfile='out_test.csv'):
                 # save/store/write
                 writer.writerow(norm_row)
 
-    assert nlines == 2692, "nlines: {}".format(nlines)
+    assert nlines == 2691, "nlines: {}".format(nlines)
     print("file '{}' OK, {} lines readed".format(infile, nlines))
     # check writed file, optional
     #~ check_csv_file(outfile, csvopts, flds, 2691)
 
-def load_photos(infile):
-    """Load photos to sorted array. Sort by time attribute
+def fillEmptyCoords(infile='in_test.csv', outfile='out_test.csv'):
+    """For records with empty coords
+    calculate coords from nearest records with valid coords
     """
-    dtf = datetime_format()['format']
-    dtl = datetime_format()['len']
+    csvopts = CSV.csv_options()
+    flds = CSV.list_out_fields()
 
-    def dt2ts(dts):
-        dt = datetime.strptime(dts, dtf)
-        ts = dt.timestamp()
-        assert dts == datetime.fromtimestamp(ts).strftime(dtf)[:dtl]
-        return ts
+    photos = load_recs_with_gps(infile)
+    assert len(photos) == 1243
+    check_photos_sorted(photos)
+
+def load_recs_with_gps(infile):
+    """Load photos with coords to sorted array. Sort by time attribute
+    """
 
     def new_photo(rec):
         return {
-            'ts' : dt2ts(rec['Composite:SubSecDateTimeOriginal']),
-            'alt': rec['Composite:GPSAltitude'],
-            'lat': rec['Composite:GPSLatitude'],
-            'lon': rec['Composite:GPSLongitude']
+            'ts' : CSV.dt2ts(rec[CSV.COLNAME_TS]),
+            'alt': rec[CSV.COLNAME_ALT],
+            'lat': rec[CSV.COLNAME_LAT],
+            'lon': rec[CSV.COLNAME_LON]
         }
 
+    def gps_ok(obj):
+        return (len(obj['lat']) > 0 and len(obj['lon']) > 0)
+
     photos = []
-    csvopts = csv_options()
+    csvopts = CSV.csv_options()
     with open(infile, newline='') as inf:
         reader = csv.DictReader(inf, **csvopts)
         for row in reader:
             obj = new_photo(row)
-            photos.append(obj)
+            if gps_ok(obj):
+                photos.append(obj)
 
+    print("loaded records with coords: {}".format(len(photos)))
     return sorted(photos, key=lambda x: x['ts'])
-
-def check_photos_sorted(photos):
-    """Check if list is sorted by 'ts' attribute
-    """
-    ts = 0
-    for photo in photos:
-        assert photo['ts'] >= ts
-        ts = photo['ts']
 
 def findPhoto(ts, photos):
     """Find photo nearest by time
@@ -255,21 +249,21 @@ def build_video_record(video_fname, photos):
     ts = fn2ts(video_fname.split('/')[-1])
     photo = findPhoto(ts, photos)
 
-    dtf = datetime_format()['format']
-    dtl = datetime_format()['len']
+    dtf = CSV.datetime_format()['format']
+    dtl = CSV.datetime_format()['len']
 
-    rec['SourceFile'] = video_fname
-    rec['Composite:GPSAltitude'] = photo['alt']
-    rec['Composite:GPSLatitude'] = photo['lat']
-    rec['Composite:GPSLongitude'] = photo['lon']
-    rec['Composite:SubSecDateTimeOriginal'] = datetime.fromtimestamp(ts).strftime(dtf)[:dtl]
+    rec[CSV.COLNAME_PATH] = video_fname
+    rec[CSV.COLNAME_ALT] = photo['alt']
+    rec[CSV.COLNAME_LAT] = photo['lat']
+    rec[CSV.COLNAME_LON] = photo['lon']
+    rec[CSV.COLNAME_TS] = datetime.fromtimestamp(ts).strftime(dtf)[:dtl]
     return rec
 
 def norm_video(in_video, in_photo, outfile):
     """Copy coords to video record from nearest photo
     """
-    csvopts = csv_options()
-    flds = list_out_fields()
+    csvopts = CSV.csv_options()
+    flds = CSV.list_out_fields()
 
     photos = load_photos(in_photo)
     assert len(photos) == 1302
@@ -284,7 +278,7 @@ def norm_video(in_video, in_photo, outfile):
 
             for row in reader:
                 nlines += 1
-                rec = build_video_record(row['SourceFile'], photos)
+                rec = build_video_record(row[CSV.COLNAME_PATH], photos)
 
                 check_columns(rec.keys(), flds)
                 for k,v in rec.items():
@@ -294,24 +288,6 @@ def norm_video(in_video, in_photo, outfile):
 
     assert nlines == 30, "nlines: {}".format(nlines)
     print("file '{}' OK, {} lines processed".format(in_video, nlines))
-
-def union_csv(first_infile, second_infile, outfile):
-    """Union two csv files
-    """
-    first_nlines, second_nlines = 0, 0
-    with open(outfile, 'w', newline='\r\n') as outf:
-        with open(first_infile) as inf:
-            for line in inf:
-                first_nlines +=1
-                outf.write(line)
-        with open(second_infile) as inf:
-            for line in inf:
-                second_nlines += 1
-                if second_nlines > 1:
-                    outf.write(line)
-
-    assert first_nlines + second_nlines == 1302 + 30 + 1 + 1
-    print("file '{}' should be OK, {} + {} lines processed".format(outfile, first_nlines, second_nlines))
 
 def start_time():
     start_ns = time.time_ns()
@@ -332,11 +308,48 @@ def end_time(start_ns):
 
     return end_ns
 
+def check_columns(cols, expected_cols):
+    """Assert that cols list is equal expected_cols list
+    """
+    pairs = zip_longest(cols, expected_cols, fillvalue='oops')
+    for c,e in pairs:
+        assert c == e, "column {} != expected col {}".format(c, e)
+
+def check_csv_file(fname, csvopts, exp_flds, exp_nrecs):
+    """Check if file have all fields and values are not empty
+    """
+    nlines = 0
+    with open(fname, newline='') as inf:
+        reader = csv.DictReader(inf, **csvopts)
+        for row in reader:
+            nlines += 1
+            assert len(row) == len(exp_flds), "len(row): {}".format(len(row))
+            check_columns(row.keys(), exp_flds)
+            for k,v in row.items():
+                assert len(v.strip()) > 0, "empty column value: {}".format(k)
+
+    assert nlines == exp_nrecs, "nlines: {}, should be {}".format(nlines, exp_nrecs)
+    print("file '{}' OK, {} lines checked".format(fname, nlines))
+
+def check_photos_sorted(photos):
+    """Check if list is sorted by 'ts' attribute
+    """
+    ts = 0
+    for photo in photos:
+        assert photo['ts'] >= ts
+        ts = photo['ts']
+
+def split_n_trim(txt, sep='\n'):
+    """Return list of non-empty strings from input splitted by blank chars
+    """
+    lst = txt.split(sep)
+    return [x.strip() for x in lst if x.strip()]
+
 def main():
     st = start_time()
     infile,outfile = sys.argv[1:3]
-    normalize(infile, outfile)
-    # fillEmptyCoords
+    normalize(infile, infile + '.with_ts')
+    fillEmptyCoords(infile + '.with_ts', outfile)
     end_time(st)
 
 if __name__ == "__main__":
