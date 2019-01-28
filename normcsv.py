@@ -31,6 +31,7 @@ from datetime import datetime, timedelta
 
 class CSV:
     COLNAME_PATH = 'SourceFile'
+    COLNAME_ROT  = 'IFD0:Orientation'
     COLNAME_TS   = 'Composite:SubSecDateTimeOriginal'
     COLNAME_ALT  = 'Composite:GPSAltitude'
     COLNAME_LAT  = 'Composite:GPSLatitude'
@@ -45,7 +46,7 @@ class CSV:
         """
         lst = [
             CSV.COLNAME_PATH,
-            'IFD0:Orientation',
+            CSV.COLNAME_ROT,
             CSV.COLNAME_ALT,
             CSV.COLNAME_LAT,
             CSV.COLNAME_LON,
@@ -94,7 +95,7 @@ def normalize_row(row, columns):
     .../VID_20181005_152619.mp4 => 2018:10:05 15:26:19.00
     """
 
-    def dateTimeFromFileName(path):
+    def dt_from_fname(path):
         dtf = CSV.TS_FORMAT
         dtl = CSV.TS_LEN
         fname = split_n_trim(path.upper(), '/')[-1]
@@ -118,7 +119,7 @@ def normalize_row(row, columns):
     def normalize_value(colname, colvalue):
         val = colvalue.strip()
         if val == '' and colname == CSV.COLNAME_TS:
-            val = dateTimeFromFileName(row[CSV.COLNAME_PATH].strip())
+            val = dt_from_fname(row[CSV.COLNAME_PATH].strip())
 
         return (colname, val)
 
@@ -152,10 +153,8 @@ def normalize(infile='in_test.csv', outfile='out_test.csv'):
 
     assert nlines == 2691, "nlines: {}".format(nlines)
     print("file '{}' OK, {} lines readed".format(infile, nlines))
-    # check writed file, optional
-    #~ check_csv_file(outfile, csvopts, flds, 2691)
 
-def fillEmptyCoords(infile='in_test.csv', outfile='out_test.csv'):
+def fill_empty_coords(infile='in_test.csv', outfile='out_test.csv'):
     """For records with empty coords
     calculate coords from nearest records with valid coords
     """
@@ -165,6 +164,61 @@ def fillEmptyCoords(infile='in_test.csv', outfile='out_test.csv'):
     photos = load_recs_with_gps(infile)
     assert len(photos) == 1243
     check_photos_sorted(photos)
+
+    nlines = 0
+    with open(infile, newline='') as inf:
+        with open(outfile, 'w', newline='') as outf:
+            reader = csv.DictReader(inf, **csvopts)
+            writer = csv.DictWriter(outf, fieldnames=flds, **csvopts)
+            writer.writeheader()
+
+            for row in reader:
+                if is_gps_ok(row):
+                    rec = row
+                else:
+                    nlines += 1
+                    rec = add_coords2record(row, photos)
+
+                check_columns(rec.keys(), flds)
+                for k,v in rec.items():
+                    assert len(str(v).strip()) > 0, "empty column: {}".format(k)
+
+                writer.writerow(rec)
+
+    assert nlines == 1448, "nlines: {}".format(nlines)
+    print("set coords to {} records".format(nlines))
+    # check writed file, optional
+    check_csv_file(outfile, csvopts, flds, 2691)
+
+def add_coords2record(row, photos):
+    """Find nearest photos with coords, calculate approximate values for row
+    """
+    ts = CSV.dt2ts(row[CSV.COLNAME_TS])
+    prev_idx = find_photo(ts, photos)
+    next_idx = prev_idx + 1
+    if next_idx >= len(photos):
+        next_idx -= 1
+
+    def ratio(prev, next, p):
+        assert p >= prev and p <= next and next > prev
+        return float(p - prev) / float(next - prev) # 0 .. 1
+
+    def approximate(col, rat):
+        prev = float(photos[prev_idx][col])
+        next = float(photos[next_idx][col])
+        return prev + (next - prev) * rat
+
+    rat = ratio(photos[prev_idx]['ts'], photos[next_idx]['ts'], ts)
+
+    row[CSV.COLNAME_ROT] = 0
+    row[CSV.COLNAME_ALT] = approximate('alt', rat)
+    row[CSV.COLNAME_LAT] = approximate('lat', rat)
+    row[CSV.COLNAME_LON] = approximate('lon', rat)
+    return row
+
+def is_gps_ok(row):
+    return all(len(row[colname]) > 0
+        for colname in [CSV.COLNAME_LAT, CSV.COLNAME_LON])
 
 def load_recs_with_gps(infile):
     """Load photos with coords to sorted array. Sort by time attribute
@@ -178,23 +232,19 @@ def load_recs_with_gps(infile):
             'lon': rec[CSV.COLNAME_LON]
         }
 
-    def gps_ok(obj):
-        return (len(obj['lat']) > 0 and len(obj['lon']) > 0)
-
     photos = []
     csvopts = CSV.csv_options()
     with open(infile, newline='') as inf:
         reader = csv.DictReader(inf, **csvopts)
         for row in reader:
-            obj = new_photo(row)
-            if gps_ok(obj):
-                photos.append(obj)
+            if is_gps_ok(row):
+                photos.append(new_photo(row))
 
     print("loaded records with coords: {}".format(len(photos)))
     return sorted(photos, key=lambda x: x['ts'])
 
-def findPhoto(ts, photos):
-    """Find photo nearest by time
+def find_photo(ts, photos):
+    """Find photo nearest by time, return index for last previous photo
     """
     def binsearch(lo, hi):
         if (hi - lo) <= 0:
@@ -208,86 +258,11 @@ def findPhoto(ts, photos):
             return binsearch(lo, lo+mid)
         return binsearch(lo+mid+1, hi)
 
-    maxidx = len(photos) - 1
-    idx = binsearch(0, maxidx)
-    idx_ts = photos[idx]['ts']
-
-    def closer(alt_idx):
-        if alt_idx < 0 or alt_idx > maxidx:
-            return false
-        alt_ts = photos[alt_idx]['ts']
-        return ( abs(ts - alt_ts) <= abs(ts - idx_ts) )
-
-    photo = photos[idx]
-    if ts < idx_ts and closer(idx - 1):
-        photo = photos[idx - 1]
-    elif ts > idx_ts and closer(idx + 1):
-        photo = photos[idx + 1]
-
-    assert abs(ts - photo['ts']) <= 381
-    return photo
-
-def build_video_record(video_fname, photos):
-    """Using video filename as datetime source, copy attributes from nearest photo.
-    Return OrderedDict record for writing to csv
-    """
-    flds = list_out_fields()
-    # init values
-    rec = OrderedDict([(k, '0') for k in flds])
-
-    def fn2ts(fn):
-        """Decode filename to timestamp.
-        if fn: VID_20181030_100115.mp4 then dt: 2018-10-30 10:01:15
-        """
-        fmt = "%Y%m%d_%H%M%S"
-        dts = fn[4:][:-4] # 20181030_100115
-        dt = datetime.strptime(dts, fmt)
-        ts = dt.timestamp()
-        assert dts == datetime.fromtimestamp(ts).strftime(fmt)[:15]
-        return ts
-
-    ts = fn2ts(video_fname.split('/')[-1])
-    photo = findPhoto(ts, photos)
-
-    dtf = CSV.datetime_format()['format']
-    dtl = CSV.datetime_format()['len']
-
-    rec[CSV.COLNAME_PATH] = video_fname
-    rec[CSV.COLNAME_ALT] = photo['alt']
-    rec[CSV.COLNAME_LAT] = photo['lat']
-    rec[CSV.COLNAME_LON] = photo['lon']
-    rec[CSV.COLNAME_TS] = datetime.fromtimestamp(ts).strftime(dtf)[:dtl]
-    return rec
-
-def norm_video(in_video, in_photo, outfile):
-    """Copy coords to video record from nearest photo
-    """
-    csvopts = CSV.csv_options()
-    flds = CSV.list_out_fields()
-
-    photos = load_photos(in_photo)
-    assert len(photos) == 1302
-    check_photos_sorted(photos)
-
-    nlines = 0
-    with open(in_video, newline='') as inf:
-        with open(outfile, 'w', newline='') as outf:
-            reader = csv.DictReader(inf, **csvopts)
-            writer = csv.DictWriter(outf, fieldnames=flds, **csvopts)
-            writer.writeheader()
-
-            for row in reader:
-                nlines += 1
-                rec = build_video_record(row[CSV.COLNAME_PATH], photos)
-
-                check_columns(rec.keys(), flds)
-                for k,v in rec.items():
-                    assert len(v.strip()) > 0, "empty column: {}".format(k)
-
-                writer.writerow(rec)
-
-    assert nlines == 30, "nlines: {}".format(nlines)
-    print("file '{}' OK, {} lines processed".format(in_video, nlines))
+    idx = binsearch(0, len(photos) - 1)
+    if photos[idx]['ts'] < ts or idx == 0:
+        return idx
+    else:
+        return idx - 1
 
 def start_time():
     start_ns = time.time_ns()
@@ -349,7 +324,7 @@ def main():
     st = start_time()
     infile,outfile = sys.argv[1:3]
     normalize(infile, infile + '.with_ts')
-    fillEmptyCoords(infile + '.with_ts', outfile)
+    fill_empty_coords(infile + '.with_ts', outfile)
     end_time(st)
 
 if __name__ == "__main__":

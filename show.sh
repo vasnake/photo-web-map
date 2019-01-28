@@ -337,7 +337,8 @@ EOF
         -v "${__dir}":/usr/src/project \
         -w /usr/src/project \
         ${DOCKERIMAGE} \
-        bash geocode.sh
+        python -u geocode.py \
+            norm_data_tab.csv map_markers_data.csv
 
     # output: map_markers_data.csv
 }

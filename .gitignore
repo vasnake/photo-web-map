@@ -10,3 +10,4 @@ t/
 *.csv
 *.dos
 *.norm
+*.with_ts
