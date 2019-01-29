@@ -59,6 +59,10 @@ th.tg-0lax {
     width: 18%;
 }
 
+#btnShowPrevious {
+    margin-left: 50pt;
+}
+
 </style>
 
 </head>
@@ -118,6 +122,7 @@ var photos = [{
   "lat": 34.04555452,
   "lng": -118.3001509,
   "name": "C.H. Johnston, 1951",
+  "ts": "2018:10:11 12:23:15.33",
   "url": "http://41.media.tumblr.com/8dd3cc5931650a6a772db77f6fad797b/tumblr_n5c7uw79Yn1tq6tdto1_400.jpg",
   "thumbnail": "http://41.media.tumblr.com/8dd3cc5931650a6a772db77f6fad797b/tumblr_n5c7uw79Yn1tq6tdto1_400.jpg"
 }];
@@ -127,7 +132,7 @@ var photos = [{
 function setupFilter() {
     console.log("setupFilter ...");
 
-    // get filter list items from array of photos
+    // get filter list items from array of photos (dates, states, towns)
     const sets = getItemsSets(photos);
 
     function setupSelect(sel, items, choice) {
@@ -250,12 +255,20 @@ function newPhoto(feature) {
         'name': props['compositesubsecdatetimeoriginal'].slice(0, 10) + ';' +
                 props['state'] + ';' +
                 props['town'],
+        'ts': props['compositesubsecdatetimeoriginal'],
         'url': fname,
         'thumbnail': 'thumb/thumb-' + fname.split('/')[1].split('.')[0] + '.jpg'
         // usa-vid/VID_20181005_152619.mp4 => thumb/thumb-VID_20181005_152619.jpg
     };
 
     return photo;
+}
+
+// const currIdx = findPhoto(popupLayer.photo);
+function findPhoto(photo) {
+    const idx = photos.findIndex(p => p['ts'] == photo['ts']);
+    if (idx < 0) return 0;
+    return idx;
 }
 
 // callback after csv loaded to window
@@ -273,8 +286,56 @@ function processCSV(csvtext) {
     console.assert(Object.keys(csvlayer._layers).length == 2691, 'unexpected num of parsed csv lines');
 
     // create global array of photos
-    photos = Object.keys(csvlayer._layers)
-        .map(k => newPhoto(csvlayer._layers[k].feature));
+    photos = Object.keys(csvlayer._layers).map(k =>
+        newPhoto(csvlayer._layers[k].feature)
+        ).sort(function(a, b){
+            if(a['ts'] < b['ts']) return -1;
+            if(a['ts'] > b['ts']) return 1;
+            return 0;
+        });
+}
+
+// prev/next functionality
+var popupLayer = '';
+var popupPhoto = '';
+function photoLayerOnClick(evt) {
+    popupLayer = evt.layer;
+    popupPhoto = popupLayer.photo;
+    _photoLayerOnClick(popupLayer, popupPhoto);
+}
+function _photoLayerOnClick(layer, photo) {
+    const prevnext =    '<input type="button" value="prev" id="btnShowPrevious" onclick="showPrevNext(-1)" />' +
+                        '<input type="button" value="next" id="btnShowNext" onclick="showPrevNext(1)" />';
+    var template = '<a href="{url}"><img src="{url}"/></a>' +
+        '<p>{name}' + prevnext + '</p>';
+
+    if (photo.url.endsWith('.mp4') && (!!document.createElement('video').canPlayType(
+        'video/mp4; codecs=avc1.42E01E,mp4a.40.2'))) {
+        template = '<video autoplay loop controls poster="{thumbnail}" ' +
+            ' width="600" height="600"> ' +
+            ' <source src="{url}" type="video/mp4"/></video> '  +
+            ' <p>{name} <a href="{url}"> mp4 </a>' + prevnext + '</p>';
+    }
+
+    layer.bindPopup(L.Util.template(template, photo), {
+        className: 'leaflet-popup-photo',
+        minWidth: 600
+    }).openPopup();
+}
+function showPrevNext(incr) {
+    const idx = Math.abs(findPhoto(popupPhoto) + incr) % photos.length;
+    popupPhoto = photos[idx];
+    _photoLayerOnClick(popupLayer, popupPhoto);
+}
+
+// add filtered photos to map
+function renderMarkersLayer(filterFunc) {
+    photoLayer.clear();
+    const filter = getFilter(filterSelectors);
+    const filtered = filterFunc.call(this, photos, filter);
+    console.log("filtered: ", filtered.length);
+    photoLayer.add(filtered);
+    map.fitBounds(photoLayer.getBounds());
 }
 
 // map setup
@@ -328,35 +389,7 @@ const photoLayer = L.photo.cluster({
     spiderfyDistanceMultiplier: 3,
     icon: {iconSize: [100, 100]}});
 
-photoLayer.on('click', function(evt) {
-  const photo = evt.layer.photo;
-
-  var template = '<a href="{url}"><img src="{url}"/></a><p>{name}</p>';
-
-  if (photo.url.endsWith('.mp4') && (!!document.createElement('video')
-    .canPlayType('video/mp4; codecs=avc1.42E01E,mp4a.40.2')
-  )) {
-    template = '<video autoplay loop controls poster="{thumbnail}" ' +
-        ' width="600" height="600"> ' +
-        ' <source src="{url}" type="video/mp4"/></video> '  +
-        ' <p>{name} <a href="{url}"> {url} </a></p>';
-  };
-
-  evt.layer.bindPopup(L.Util.template(template, photo), {
-    className: 'leaflet-popup-photo',
-    minWidth: 600
-  }).openPopup();
-});
-
-// add filtered photos to map
-function renderMarkersLayer(filterFunc) {
-    photoLayer.clear();
-    const filter = getFilter(filterSelectors);
-    const filtered = filterFunc.call(this, photos, filter);
-    console.log("filtered: ", filtered.length);
-    photoLayer.add(filtered);
-    map.fitBounds(photoLayer.getBounds());
-}
+photoLayer.on('click', photoLayerOnClick);
 
 // add layers to map
 map.addLayer(grayscaleCDB);
@@ -371,6 +404,7 @@ const baseLayers = {
     "OSM black/white": osmBW,
     "OTM": otmCLR,
     "Thunderforest outdoors": thunderforestOTD };
+
 const overlays = { "Photos": photoLayer };
 L.control.layers(baseLayers, overlays).addTo(map);
 
