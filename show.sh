@@ -68,8 +68,8 @@ main() {
 
     if [ ${__argsLen} -ge 1 ]; then
         if [ "${__arg1}" = "dumpInfo" ]; then
-            #~ dumpInfo "${__dir}/usa-ph" "${__dir}/usa-vid" "data1"
-            #~ dumpInfo "${__dir}/usa-ph.nat" "${__dir}/usa-vid.nat" "data2"
+            dumpInfo "${__dir}/usa-ph" "${__dir}/usa-vid" "data1"
+            dumpInfo "${__dir}/usa-ph.nat" "${__dir}/usa-vid.nat" "data2"
             mergeAndNormalize "data1" "data2"
         elif [ "${__arg1}" = "geocode" ]; then
             geocode

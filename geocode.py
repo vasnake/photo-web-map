@@ -15,11 +15,14 @@ import csv
 
 import reverse_geocoder as rg
 
-from normcsv import start_time, end_time, csv_options
+from normcsv import (
+    start_time,
+    end_time,
+    CSV)
 
 
-COLNAME_LAT = 'Composite:GPSLatitude'
-COLNAME_LON = 'Composite:GPSLongitude'
+COLNAME_LAT = CSV.COLNAME_LAT
+COLNAME_LON = CSV.COLNAME_LON
 COLNAME_STATE = 'state'
 COLNAME_TOWN = 'town'
 
@@ -57,7 +60,7 @@ def show_progress(n):
 def geocode(infile='test.csv', outfile='geocoded_test.csv'):
     """For each record in infile enrich it with 'state', 'town' columns and write to outfile.
     """
-    csvopts = csv_options()
+    csvopts = CSV.csv_options()
 
     nlines = 0
     with open(infile, newline='') as inf:
@@ -72,7 +75,7 @@ def geocode(infile='test.csv', outfile='geocoded_test.csv'):
                 writer.writerow(add_town(row))
                 show_progress(nlines)
 
-    assert nlines == 1302 + 30, "nlines: {}".format(nlines)
+    assert nlines == 2691, "nlines: {}".format(nlines)
 
 def main():
     st = start_time()
