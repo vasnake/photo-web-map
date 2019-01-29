@@ -359,9 +359,13 @@ EOF
 
     echo ${MSG}
 
+    # sort
+    head -n 1 ${data} > ${data}.sorted
+    tail -n +2 ${data} | sort >> ${data}.sorted
+
     # check CRLF
-    file "${data}"
-    unix2dos -n "${data}" ${data}.dos
+    file "${data}.sorted"
+    unix2dos -n "${data}.sorted" "${data}.dos"
 
     /opt/firefox/firefox ./map.html
     #~ /opt/google/chrome/chrome --args --allow-file-access-from-files ./map.html

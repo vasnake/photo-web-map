@@ -11,3 +11,4 @@ t/
 *.dos
 *.norm
 *.with_ts
+*.sorted
