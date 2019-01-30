@@ -68,6 +68,9 @@ main() {
 
     if [ ${__argsLen} -ge 1 ]; then
         if [ "${__arg1}" = "dumpInfo" ]; then
+            #~ dumpVideoCodec "${__dir}/usa-vid" "data1"
+            #~ dumpVideoCodec "${__dir}/usa-vid.nat" "data2"
+            #~ encodeToH264 "${__dir}/usa-vid.nat"
             dumpInfo "${__dir}/usa-ph" "${__dir}/usa-vid" "data1"
             dumpInfo "${__dir}/usa-ph.nat" "${__dir}/usa-vid.nat" "data2"
             mergeAndNormalize "data1" "data2"
@@ -235,6 +238,34 @@ setupPyenvPython() {
     # https://docs.pytest.org/en/latest/usage.html
     #${PYTHON_HOME}/bin/pipenv run pytest -vv --junitxml=./test-report
     #${PYTHON_HOME}/bin/pipenv run pytest -vv -s -x
+}
+
+dumpVideoCodec() {
+    local videoDir=${1}
+    local tag=${2}
+
+    echo "SourceFile,codec" > "${__dir}/videocodec_${tag}_tab.csv"
+
+    pushd ${videoDir}
+    for fn in *.mp4; do
+        codec=$(ffprobe -v error -select_streams v:0 \
+            -show_entries stream=codec_name \
+            -of default=noprint_wrappers=1:nokey=1 \
+            ${fn})
+        echo "${videoDir}/${fn},${codec}" >> "${__dir}/videocodec_${tag}_tab.csv"
+    done;
+    popd
+}
+
+encodeToH264() {
+    # https://gist.github.com/Vestride/278e13915894821e1d6f
+    local videoDir=${1}
+    pushd ${videoDir}
+    for fn in V81011-095508.mp4 V81031-115234.mp4 V81031-150724.mp4; do
+        echo "encode '${fn}' to h264 ..."
+        ffmpeg -i "${fn}" -vcodec h264 -acodec aac -crf 18 "${fn}_h264.mp4"
+    done;
+    popd
 }
 
 dumpInfo() {
