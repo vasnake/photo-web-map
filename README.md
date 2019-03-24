@@ -6,7 +6,7 @@ web-map based on the Leaflet. This web-map should show clustered markers,
 made from thumbnails from geotagged photo and video
 that I took on my trip to USA in year 2018. Click on thumbnail should show full-size photo/video.
 
-[screenshot](map-screenshot.png)
+![screenshot](map-screenshot.png)
 
 Web-map have a filter UI, allowing to show photos and/or videos according to selected date, state, town.
 State and town names was produced with 'reverse geocoding' step of the build.
