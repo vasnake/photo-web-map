@@ -68,12 +68,15 @@ main() {
 
     if [ ${__argsLen} -ge 1 ]; then
         if [ "${__arg1}" = "dumpInfo" ]; then
-            #~ dumpVideoCodec "${__dir}/usa-vid" "data1"
-            #~ dumpVideoCodec "${__dir}/usa-vid.nat" "data2"
-            #~ encodeToH264 "${__dir}/usa-vid.nat"
-            dumpInfo "${__dir}/usa-ph" "${__dir}/usa-vid" "data1"
-            dumpInfo "${__dir}/usa-ph.nat" "${__dir}/usa-vid.nat" "data2"
-            mergeAndNormalize "data1" "data2"
+
+          dumpInfo /home/valik/bigone/photo/2018-10-usa/db \
+            /home/valik/bigone/photo/2018-10-usa/images/thumb \
+            /home/valik/bigone/photo/2018-10-usa/images/usa-ph \
+            /home/valik/bigone/photo/2018-10-usa/images/usa-vid \
+            /mnt/sdb1/America/nf \
+            /mnt/sdb1/America/usa-ph.nat \
+            /mnt/sdb1/America/usa-vid.nat
+
         elif [ "${__arg1}" = "geocode" ]; then
             geocode
         elif [ "${__arg1}" = "map" ]; then
@@ -269,6 +272,33 @@ encodeToH264() {
 }
 
 dumpInfo() {
+
+#          dumpInfo /home/valik/bigone/photo/2018-10-usa/db/ \
+#            /home/valik/bigone/photo/2018-10-usa/images/thumb \
+#            /home/valik/bigone/photo/2018-10-usa/images/usa-ph \
+#            /home/valik/bigone/photo/2018-10-usa/images/usa-vid \
+#            /mnt/sdb1/America/nf \
+#            /mnt/sdb1/America/usa-ph.nat \
+#            /mnt/sdb1/America/usa-vid.nat
+
+            #~ dumpVideoCodec "${__dir}/usa-vid" "data1"
+            #~ dumpVideoCodec "${__dir}/usa-vid.nat" "data2"
+            #~ encodeToH264 "${__dir}/usa-vid.nat"
+
+#            dumpInfo "${__dir}/usa-ph" "${__dir}/usa-vid" "data1"
+#            dumpInfo "${__dir}/usa-ph.nat" "${__dir}/usa-vid.nat" "data2"
+#            mergeAndNormalize "data1" "data2"
+
+  echo list of dirs: "$*"
+  # first: database dir
+  # second: thumbnails dir
+  # all other: photo and video dirs
+
+  pushd ${__dir}
+  python -u collect_csv.py "$@"
+  popd
+  exit 1
+
     local photosDir=${1}
     local videoDir=${2}
     local tag=${3}
