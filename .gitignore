@@ -1,3 +1,6 @@
+.idea/
+db/
+images/
 Image-ExifTool-11.16/
 usa-ph/
 usa-vid/
@@ -7,6 +10,7 @@ thumb/
 __pycache__/
 t/
 
+*.iml
 *.csv
 *.dos
 *.norm
