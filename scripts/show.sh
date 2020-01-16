@@ -295,7 +295,7 @@ dumpInfo() {
   # all other: photo and video dirs
 
   pushd ${__dir}
-  python -u collect_csv.py "$@"
+  python3 -u collect_csv.py "$@"
   popd
   exit 1
 
