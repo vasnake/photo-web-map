@@ -12,6 +12,22 @@ Expected usage:
 
 import time
 import sys
+import os
+
+
+def collect_files_info(path):
+    print("collect files in path `{}`".format(path))
+    res = []
+    _, subdirs, files = os.walk(path)
+
+    for fname in files:
+        res.append(fname)
+
+    for subdir in subdirs:
+        subres = collect_files_info(subdir)
+        res = res + subres
+
+    return res
 
 
 def main(argv):
@@ -21,9 +37,16 @@ def main(argv):
     db_dir, thumb_dir = argv[1:3]
     files_dirs = argv[3:]
 
-    print("arguments, db: <{}>\nthumb: <{}>\nfiles: <{}>".format(
+    print("arguments:\ndb: <{}>\nthumb: <{}>\nfiles: <{}>".format(
         db_dir, thumb_dir, ",".join(files_dirs)
     ))
+
+    all_files_info = []
+    for fd in files_dirs:
+        files_info = collect_files_info(fd)
+        all_files_info = all_files_info + files_info
+
+    print(all_files_info)
 
 
 if __name__ == "__main__":
