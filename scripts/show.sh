@@ -76,13 +76,15 @@ main() {
     if [ ${__argsLen} -ge 1 ]; then
         if [ "${__arg1}" = "dumpInfo" ]; then
 
-          dumpInfo /home/valik/bigone/photo/2018-10-usa/db \
-            /home/valik/bigone/photo/2018-10-usa/images/thumb \
-            /home/valik/bigone/photo/2018-10-usa/images/usa-ph \
-            /home/valik/bigone/photo/2018-10-usa/images/usa-vid \
-            /mnt/sdb1/America/nf \
-            /mnt/sdb1/America/usa-ph.nat \
-            /mnt/sdb1/America/usa-vid.nat
+          dumpInfo foo bar ../scripts ../web-map
+
+#          dumpInfo /home/valik/bigone/photo/2018-10-usa/db \
+#            /home/valik/bigone/photo/2018-10-usa/images/thumb \
+#            /home/valik/bigone/photo/2018-10-usa/images/usa-ph \
+#            /home/valik/bigone/photo/2018-10-usa/images/usa-vid \
+#            /mnt/sdb1/America/nf \
+#            /mnt/sdb1/America/usa-ph.nat \
+#            /mnt/sdb1/America/usa-vid.nat
 
         elif [ "${__arg1}" = "geocode" ]; then
             geocode

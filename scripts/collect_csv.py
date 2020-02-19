@@ -16,28 +16,30 @@ import os
 
 
 def collect_files_info(path):
-    print("collect files in path `{}`".format(path))
+    print("INFO: collect files in path `{}`".format(path))
     res = []
-    _, subdirs, files = os.walk(path)
-
-    for fname in files:
-        res.append(fname)
-
-    for subdir in subdirs:
-        subres = collect_files_info(subdir)
-        res = res + subres
+    if os.path.isdir(path):
+        for root, subdirs, files in os.walk(path):
+            print("DEBUG: root: `{}`, subdirs: `{}`, files: `{}`".format(root, subdirs, files)[:100])
+            abs_root = os.path.abspath(root)
+            for fname in files:
+                abs_fname = os.path.join(abs_root, fname)
+                print("DEBUG: abs. file path: `{}`".format(abs_fname))
+                res.append(abs_fname)
+    else:
+        print("ERROR: given path is not a directory")
 
     return res
 
 
 def main(argv):
-    print("python version: {}".format(sys.version))
+    print("INFO: python version: {}".format(sys.version))
     assert sys.version_info >= (3, 5, 5)
 
     db_dir, thumb_dir = argv[1:3]
     files_dirs = argv[3:]
 
-    print("arguments:\ndb: <{}>\nthumb: <{}>\nfiles: <{}>".format(
+    print("INFO: arguments:\ndb: <{}>\nthumb: <{}>\nfiles: <{}>".format(
         db_dir, thumb_dir, ",".join(files_dirs)
     ))
 
@@ -46,7 +48,7 @@ def main(argv):
         files_info = collect_files_info(fd)
         all_files_info = all_files_info + files_info
 
-    print(all_files_info)
+    print("INFO: all files info: {}".format(all_files_info))
 
 
 if __name__ == "__main__":
