@@ -10,26 +10,38 @@ Expected usage:
     python collect_csv.py db_dir thumb_dir first_dir [other dirs]
 """
 
-import time
-import sys
 import os
+import sys
 
 
-def collect_files_info(path):
-    print("INFO: collect files in path `{}`".format(path))
+def collect_all_files(path):
+    print("INFO: collect files in path `{}` ...".format(path))
     res = []
     if os.path.isdir(path):
         for root, subdirs, files in os.walk(path):
-            print("DEBUG: root: `{}`, subdirs: `{}`, files: `{}`".format(root, subdirs, files)[:100])
+            # print("DEBUG: root: `{}`, subdirs: `{}`, files: `{}`".format(root, subdirs, files)[:100])
             abs_root = os.path.abspath(root)
             for fname in files:
                 abs_fname = os.path.join(abs_root, fname)
-                print("DEBUG: abs. file path: `{}`".format(abs_fname))
+                print("DEBUG: file: `{}`".format(abs_fname))
                 res.append(abs_fname)
     else:
         print("ERROR: given path is not a directory")
 
     return res
+
+
+def filter_files(lst, ext=""):
+    dotext = ".{}".format(ext)
+
+    def in_condition(x):
+        cnd = False
+        if ext:
+            head, tail = os.path.splitext(x)
+            cnd = (dotext == tail)
+        return cnd
+
+    return [x for x in lst if in_condition(x)]
 
 
 def main(argv):
@@ -39,16 +51,21 @@ def main(argv):
     db_dir, thumb_dir = argv[1:3]
     files_dirs = argv[3:]
 
-    print("INFO: arguments:\ndb: <{}>\nthumb: <{}>\nfiles: <{}>".format(
-        db_dir, thumb_dir, ",".join(files_dirs)
+    print("INFO: arguments:\n\tdb dir: `{}`\n\tthumb dir: `{}`\n\tfiles dirs: `[{}]`".format(
+        db_dir, thumb_dir, ", ".join(files_dirs)
     ))
 
-    all_files_info = []
+    all_files = []
     for fd in files_dirs:
-        files_info = collect_files_info(fd)
-        all_files_info = all_files_info + files_info
+        files = collect_all_files(fd)
+        all_files += files
 
-    print("INFO: all files info: {}".format(all_files_info))
+    print("INFO: all files: \n{}".format("\n".join(all_files)))
+
+    jpg_files = filter_files(all_files, ext="py")
+    print("INFO: jpg files: \n{}".format("\n".join(jpg_files)))
+    mp4_files = filter_files(all_files, ext="css")
+    print("INFO: mp4 files: \n{}".format("\n".join(mp4_files)))
 
 
 if __name__ == "__main__":
