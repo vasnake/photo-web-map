@@ -6,6 +6,7 @@ usa-vid.nat/
 thumb/
 __pycache__/
 t/
+.idea/
 
 *.csv
 *.dos
